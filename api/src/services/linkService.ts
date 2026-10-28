@@ -52,7 +52,7 @@ export const deleteLink = async (userId: string, code: string) => {
     await Promise.all([link.deleteOne(), Click.deleteMany({ code })])
 
     // If Redis is down the cached URL survives until its TTL expires. Acceptable for this app.
-    await redis.del(cacheKey(code)).catch(() => {})
+    await redis.del(cacheKey(code)).catch(() => { })
 }
 
 export const getLinkStats = async (userId: string, code: string) => {
@@ -88,6 +88,6 @@ export const resolveLink = async (code: string) => {
     const link = await Link.findOne({ code }).select("url").lean()
     if (!link) throw new HttpError(404, "Link not found")
 
-    redis.set(cacheKey(code), link.url, "EX", LINK_CACHE_TTL_SECONDS).catch(() => {})
+    redis.set(cacheKey(code), link.url, "EX", LINK_CACHE_TTL_SECONDS).catch(() => { })
     return link.url
 }

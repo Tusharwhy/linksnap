@@ -1,0 +1,23 @@
+# --- version control ---
+.git
+.gitignore
+
+# -- dependencies ---
+node_modules/
+
+# --- local builds ---
+dist/
+build/
+
+# --- evn secrets and credentials ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa
+.aws/
+
+# --- logs and temporary files ---
+*.log
+.npm/

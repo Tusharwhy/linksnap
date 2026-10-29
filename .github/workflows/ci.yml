@@ -6,18 +6,21 @@ on:
         branches:
             - main
 jobs:
-    check:
+    install:
         runs-on: ubuntu-latest
-
         steps:
-          - name: Checkout Repository
-            uses: actions/checkout@v4
+         - name: Checkout Repository
+           uses: actions/checkout@v4
 
-          - name: Show Repository structure
-            run: ls -la
+         - name: Set up Node js
+           uses: actions/setup-node@v4
+           with: 
+            node-version: 22
 
-          - name: Confirm API and WEB directories
-            run: |
-              test -d api
-              test -d web
-              echo "API and WEB directories found"
+         - name: Install API Dependencies
+           working-directory: api
+           run: npm ci
+
+         - name: Install Web Dependencies
+           working-directory: web
+           run: npm ci

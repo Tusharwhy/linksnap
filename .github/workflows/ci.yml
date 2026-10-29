@@ -1,0 +1,23 @@
+name: LinkSnap CI
+
+on: 
+    pull_request:
+    push:
+        branches:
+            - main
+jobs:
+    check:
+        runs-on: ubuntu-latest
+
+        steps:
+          - name: Checkout Repository
+            uses: actions/checkout@v4
+
+          - name: Show Repository structure
+            run: ls -la
+
+          - name: Confirm API and WEB directories
+            run: |
+              test -d api
+              test -d web
+              echo "API and WEB directories found"

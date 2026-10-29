@@ -1,0 +1,49 @@
+services:
+  api:
+    build: ./api
+    image: linksnap-api
+    env_file: ./api/.env
+    environment:
+      - NODE_ENV=production
+      - TRUST_PROXY=1
+      - PUBLIC_BASE_URL=http://localhost:8080
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+    
+    restart: unless-stopped
+  
+  worker:
+    image: linksnap-api
+    command: ["node", "dist/worker.js"]
+    env_file: ./api/.env
+    environment: 
+      - NODE_ENV=production
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9100/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+
+    restart: unless-stopped
+
+    
+  web:
+    build:
+      context: ./web
+    ports:
+      - "8080:80"
+
+    depends_on:
+      api: 
+       condition: service_healthy
+    restart: unless-stopped 
+    
+   
+   

@@ -34,6 +34,10 @@ jobs:
             node-version: 22
             cache: npm
             cache-dependency-path: web/package-lock.json 
+
+         - name: Test API
+           working-directory: api
+           run: npm test
         
          - name: Build api
            working-directory: api

@@ -11,7 +11,7 @@ permissions:
 
 
 jobs:
-    install:
+    api-ci:
         runs-on: ubuntu-latest
         steps:
          - name: Checkout Repository
@@ -34,7 +34,33 @@ jobs:
             node-version: 22
             cache: npm
             cache-dependency-path: web/package-lock.json 
+        
+         - name: Build api
+           working-directory: api
+           run: npm run build
+
+        
+    web-ci:
+        runs-on: ubuntu-latest
+        steps:
+         - name: Checkout Repository
+           uses: actions/checkout@v4
+
+         - name: Setup cache for Web dependecies
+           uses: actions/setup-node@v4
+           with:
+            node-version: 22
+            cache: npm
+            cache-dependency-path: web/package-lock.json 
 
          - name: Install Web Dependencies
            working-directory: web
            run: npm ci
+         
+         - name: Lint web
+           working-directory: web
+           run: npm run lint
+         
+         - name: Build web
+           working-directory: web
+           run: npm run build

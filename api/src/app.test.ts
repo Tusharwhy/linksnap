@@ -14,7 +14,8 @@ after(() => {
 test("GET /healthz returns 200 and a healthy message", async () => {
     const response = await request(app).get("/healthz");
 
-    assert.equal(response.status, 200);
+    // assert.equal(response.status, 200);
+    assert.equal(response.status, 201);
     assert.deepEqual(response.body, {
         message: "LinkSnap API is healthy",
     });

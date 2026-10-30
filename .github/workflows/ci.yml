@@ -1,95 +1,182 @@
-name: LinkSnap CI
+name: LinkSnap CI/CD
 
-on: 
-    pull_request:
-    push:
-        branches:
-            - main
+on:
+  pull_request:
+  push:
+    branches:
+      - main
 
-permissions: 
-    contents: read
-
+# Default permissions for all jobs
+permissions:
+  contents: read
 
 jobs:
-    api-ci:
-        runs-on: ubuntu-latest
-        steps:
-         - name: Checkout Repository
-           uses: actions/checkout@v4
+  # -------------------------
+  # API CI
+  # -------------------------
+  api-ci:
+    runs-on: ubuntu-latest
 
-         - name: Set up Node js and cache dependencies
-           uses: actions/setup-node@v4
-           with: 
-            node-version: 22
-            cache: npm
-            cache-dependency-path: api/package-lock.json
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
 
-         - name: Install API Dependencies
-           working-directory: api
-           run: npm ci
+      - name: Set up Node.js and cache dependencies
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: api/package-lock.json
 
-         - name: Setup cache for Web dependecies
-           uses: actions/setup-node@v4
-           with:
-            node-version: 22
-            cache: npm
-            cache-dependency-path: web/package-lock.json 
+      - name: Install API Dependencies
+        working-directory: api
+        run: npm ci
 
-         - name: Test API
-           working-directory: api
-           run: npm test
-        
-         - name: Build api
-           working-directory: api
-           run: npm run build
+      - name: Test API
+        working-directory: api
+        run: npm test
 
-        
-    web-ci:
-        runs-on: ubuntu-latest
-        steps:
-         - name: Checkout Repository
-           uses: actions/checkout@v4
+      - name: Build API
+        working-directory: api
+        run: npm run build
 
-         - name: Setup cache for Web dependecies
-           uses: actions/setup-node@v4
-           with:
-            node-version: 22
-            cache: npm
-            cache-dependency-path: web/package-lock.json 
+  # -------------------------
+  # WEB CI
+  # -------------------------
+  web-ci:
+    runs-on: ubuntu-latest
 
-         - name: Install Web Dependencies
-           working-directory: web
-           run: npm ci
-         
-         - name: Lint web
-           working-directory: web
-           run: npm run lint
-         
-         - name: Build web
-           working-directory: web
-           run: npm run build
-    
-    docker-build:
-      runs-on: ubuntu-latest
-      needs: [api-ci, web-ci]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
 
-      steps:
-       - name: Checkout repository
-         uses: actions/checkout@v4
+      - name: Set up Node.js and cache dependencies
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
 
-       - name: Setup Docker Buildx
-         uses: docker/setup-buildx-action@v3
+      - name: Install Web Dependencies
+        working-directory: web
+        run: npm ci
 
-       - name: Build API image
-         uses: docker/build-push-action@v6
-         with:
-           context: ./api
-           push: false
-           tags: linksnap-api:test
+      - name: Lint Web
+        working-directory: web
+        run: npm run lint
 
-       - name: Build Web image
-         uses: docker/build-push-action@v6
-         with:
+      - name: Build Web
+        working-directory: web
+        run: npm run build
+
+  # -------------------------
+  # DOCKER BUILD VALIDATION
+  # -------------------------
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [api-ci, web-ci]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build API image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./api
+          push: false
+          tags: linksnap-api:test
+
+      - name: Build Web image
+        uses: docker/build-push-action@v7
+        with:
           context: ./web
           push: false
           tags: linksnap-web:test
+
+  # -------------------------
+  # PUBLISH TO GHCR
+  # -------------------------
+  publish:
+    runs-on: ubuntu-latest
+
+    # Wait for Docker build validation
+    needs: [docker-build]
+
+    # Publish only after a push to main, never on a PR
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    # Least-privilege permissions
+    permissions:
+      contents: read
+      packages: write
+
+    env:
+      IMAGE_TAG: ${{ github.sha }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # Build API locally
+      - name: Build API image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./api
+          load: true
+          tags: ghcr.io/tusharwhy/linksnap-api:${{ github.sha }}
+
+      # Scan API
+      - name: Scan API image with Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/tusharwhy/linksnap-api:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+
+      # Build Web locally
+      - name: Build Web image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./web
+          load: true
+          tags: ghcr.io/tusharwhy/linksnap-web:${{ github.sha }}
+
+      # Scan Web
+      - name: Scan Web image with Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/tusharwhy/linksnap-web:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+
+      # Push only after both scans pass
+      - name: Push images to GHCR
+        run: |
+          docker tag ghcr.io/tusharwhy/linksnap-api:$IMAGE_TAG ghcr.io/tusharwhy/linksnap-api:latest
+          docker tag ghcr.io/tusharwhy/linksnap-web:$IMAGE_TAG ghcr.io/tusharwhy/linksnap-web:latest
+
+          docker push ghcr.io/tusharwhy/linksnap-api:$IMAGE_TAG
+          docker push ghcr.io/tusharwhy/linksnap-api:latest
+
+          docker push ghcr.io/tusharwhy/linksnap-web:$IMAGE_TAG
+          docker push ghcr.io/tusharwhy/linksnap-web:latest

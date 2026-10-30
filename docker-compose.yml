@@ -1,7 +1,7 @@
 services:
   api:
     build: ./api
-    image: linksnap-api
+    image: ghcr.io/tusharwhy/linksnap-api:${IMAGE_TAG:-latest}
     env_file: ./api/.env
     environment:
       - NODE_ENV=production
@@ -18,7 +18,7 @@ services:
     restart: unless-stopped
   
   worker:
-    image: linksnap-api
+    image: ghcr.io/tusharwhy/linksnap-api:${IMAGE_TAG:-latest}
     command: ["node", "dist/worker.js"]
     env_file: ./api/.env
     environment: 
@@ -37,6 +37,7 @@ services:
   web:
     build:
       context: ./web
+    image: ghcr.io/tusharwhy/linksnap-web:${IMAGE_TAG:-latest}
     ports:
       - "8080:80"
 

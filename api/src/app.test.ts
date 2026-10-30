@@ -28,3 +28,21 @@ test("Unknown routes return 404", async () => {
         message: "Route not found",
     });
 });
+
+
+
+test("Protected routes reject requests without an access token", async () => {
+    const response = await request(app).get("/api/v1/links");
+
+    assert.equal(response.status, 401);
+    assert.equal(response.body.message, "Missing token");
+});
+
+test("Protected routes reject invalid access tokens", async () => {
+    const response = await request(app)
+        .get("/api/v1/links")
+        .set("Authorization", "Bearer invalid-token");
+
+    assert.equal(response.status, 401);
+    assert.equal(response.body.message, "Invalid or expired token");
+});

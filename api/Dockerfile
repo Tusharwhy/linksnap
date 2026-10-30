@@ -25,6 +25,11 @@ WORKDIR /usr/src/app
 
 ENV NODE_ENV=production
 
+# npm is not required to run the application
+RUN rm -rf /usr/local/lib/node_modules/npm \
+    /usr/local/bin/npm \
+    /usr/local/bin/npx
+
 COPY --from=build /usr/src/app/package*.json ./
 COPY --from=build /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/dist ./dist

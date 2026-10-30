@@ -1,46 +1,82 @@
-name: Publish Linksnap images
+
+name: Publish LinkSnap Images
 
 on:
-    push:
-        branches:
-            - main
+  push:
+    branches:
+      - main
+
 permissions:
-    contents: read
-    packages: write
+  contents: read
+  packages: write
+
 jobs:
-    publish: 
-        runs-on: ubuntu-latest
+  publish:
+    runs-on: ubuntu-latest
 
-        steps:
-          - name: Checkout Repository
-            uses: actions/checkout@v4
+    env:
+      IMAGE_TAG: ${{ github.sha }}
 
-          - name: Login to GHCR
-            uses: docker/login-action@v3
-            with: 
-                registry: ghcr.io
-                username: ${{github.actor}}
-                password: ${{secrets.GITHUB_TOKEN}}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-          - name: Setup Docker Buildx
-            uses: docker/setup-buildx-action@v3
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-          - name: Build and push image
-            uses: docker/build-push-action@v6
-            with:
-                context: ./api
-                push: true
-                tags: |
-                   ghcr.io/tusharwhy/linksnap-api:${{ github.sha }}
-                   ghcr.io/tusharwhy/linksnap-api:latest
-            
-          - name: Build and push Web image
-            uses: docker/build-push-action@v6
-            with:
-                context: ./web
-                push: true
-                tags: |
-                   ghcr.io/tusharwhy/linksnap-web:${{ github.sha }}
-                   ghcr.io/tusharwhy/linksnap-web:latest
-      
-       
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build API locally
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./api
+          load: true
+          tags: ghcr.io/tusharwhy/linksnap-api:${{ github.sha }}
+
+      # Scan API
+      - name: Scan API image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/tusharwhy/linksnap-api:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+
+      # Build Web locally
+      - name: Build Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./web
+          load: true
+          tags: ghcr.io/tusharwhy/linksnap-web:${{ github.sha }}
+
+      # Scan Web
+      - name: Scan Web image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/tusharwhy/linksnap-web:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+
+      # Only publish after both scans pass
+      - name: Push images to GHCR
+        run: |
+          docker tag ghcr.io/tusharwhy/linksnap-api:$IMAGE_TAG ghcr.io/tusharwhy/linksnap-api:latest
+          docker tag ghcr.io/tusharwhy/linksnap-web:$IMAGE_TAG ghcr.io/tusharwhy/linksnap-web:latest
+
+          docker push ghcr.io/tusharwhy/linksnap-api:$IMAGE_TAG
+          docker push ghcr.io/tusharwhy/linksnap-api:latest
+
+          docker push ghcr.io/tusharwhy/linksnap-web:$IMAGE_TAG
+          docker push ghcr.io/tusharwhy/linksnap-web:latest
